@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String        @id @default(uuid())
+  address        String        @unique // Wallet address
+  username       String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  points         Int           @default(0)
+  nfts           NFT[]         @relation("OwnerNFTs")
+  sellerListings Listing[]     @relation("SellerListings") // NFTs listed by this user
+  transactions   Transaction[]
+  gameSessions   GameSession[]
+  buyerListings  Listing[]     @relation("BuyerListings")
+}
+
+model NFT {
+  id          String   @id @default(uuid())
+  tokenId     String   @unique // On-chain NFT tokenId (hex or string)
+  contract    String // Address of the on-chain NFT contract
+  ownerId     String
+  owner       User     @relation("OwnerNFTs", fields: [ownerId], references: [id])
+  metadataUri String
+  name        String
+  description String?
+  image       String?
+  createdAt   DateTime @default(now())
+  rarity      String?
+  attributes  Json?
+  inListing   Listing? // Current listing if any
+
+  Transaction Transaction[]
+}
+
+model Listing {
+  id         String    @id @default(uuid())
+  nftId      String    @unique
+  nft        NFT       @relation(fields: [nftId], references: [id])
+  sellerId   String
+  seller     User      @relation("SellerListings", fields: [sellerId], references: [id])
+  price      Int // Price in Points (ERC20, not ETH)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  buyerId    String?
+  buyer      User?     @relation("BuyerListings", fields: [buyerId], references: [id])
+  saleTxHash String?
+  closedAt   DateTime?
+}
+
+model Transaction {
+  id        String          @id @default(uuid())
+  txHash    String          @unique
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  type      TransactionType
+  amount    Int
+  nftId     String?
+  nft       NFT?            @relation(fields: [nftId], references: [id])
+  createdAt DateTime        @default(now())
+  // type: EARN, MINT, BUY, SELL, TRANSFER, etc.
+}
+
+enum TransactionType {
+  EARN
+  SPEND
+  MINT
+  BUY
+  SELL
+  TRANSFER
+}
+
+model GameSession {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  score        Int
+  earnedPoints Int
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+  game         String
+
+  Game Game[]
+}
+
+model Game {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  image       String?
+  createdAt   DateTime      @default(now())
+  sessions    GameSession[]
+}
